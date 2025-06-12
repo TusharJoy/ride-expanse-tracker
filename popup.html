@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ride Expanse Tracker Pro</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Ride Expanse Tracker</h1>
+            <div class="auth-status" id="authStatus">
+                <span class="status-dot"></span>
+                <span class="status-text">Not Connected</span>
+            </div>
+        </header>
+
+        <main>
+            <section class="summary">
+                <div class="summary-card">
+                    <h3>Lifetime Total</h3>
+                    <p class="amount" id="lifetimeTotal">BDT 0.00</p>
+                </div>
+                <div class="summary-card">
+                    <h3>This Month</h3>
+                    <p class="amount" id="monthlyTotal">BDT 0.00</p>
+                </div>
+                <div class="summary-card">
+                    <h3>This Year</h3>
+                    <p class="amount" id="yearlyTotal">BDT 0.00</p>
+                </div>
+            </section>
+
+            <section class="actions">
+                <button id="connectBtn" class="btn primary">Connecting...</button>
+                <button id="scanBtn" class="btn secondary" disabled>Scan Emails</button>
+                <button id="exportBtn" class="btn secondary" disabled>Export CSV</button>
+            </section>
+
+            <section class="filters">
+                <div class="date-range">
+                    <input type="date" id="startDate" class="date-input">
+                    <span>to</span>
+                    <input type="date" id="endDate" class="date-input">
+                </div>
+                <button id="filterBtn" class="btn secondary" disabled>Apply Filter</button>
+            </section>
+
+            <section class="transactions">
+                <h2>Recent Transactions</h2>
+                <div class="transactions-list" id="transactionsList">
+                    <!-- Transactions will be inserted here -->
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <button id="clearDataBtn" class="btn danger" disabled>Clear All Data</button>
+        </footer>
+    </div>
+    <script src="popup.js" type="module"></script>
+</body>
+</html> 
