@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Ride Cost Tracker Pro",
   "version": "1.0.0",
-  "description": "Track your ride expenses by scanning Gmail receipts",
+  "description": "Automatically track ride expenses from Uber, Lyft & other services by scanning Gmail receipts. View totals, export data & manage spending.",
   "permissions": [
     "identity",
     "storage"
@@ -26,7 +26,7 @@
     "128": "icons/icon128.png"
   },
   "oauth2": {
-    "client_id": "GCP_CLIENT_ID",
+    "client_id": "705268801173-q0uqqt4rbcjrdfd5jso10e7f0ku9f2en.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/gmail.readonly",
       "https://www.googleapis.com/auth/userinfo.email"

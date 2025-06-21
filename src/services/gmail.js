@@ -1,5 +1,4 @@
 import { oauthService } from "./oauth.js";
-import { storageService } from "./storage.js";
 
 class GmailService {
   constructor() {
@@ -11,9 +10,11 @@ class GmailService {
     await oauthService.init();
   }
 
-  async searchEmails(query = 'from:uber subject:"receipt"', maxResults = 100) {
+  async searchEmails(
+    query = "from:noreply@uber.com OR from:uber",
+    maxResults = 100
+  ) {
     try {
-      console.log("Searching emails with query:", query);
       const response = await fetch(
         `${this.baseUrl}/messages?q=${encodeURIComponent(
           query
@@ -25,12 +26,10 @@ class GmailService {
 
       if (!response.ok) {
         const error = await response.json();
-        console.error("Error searching emails:", error);
         throw new Error(error.error?.message || "Failed to search emails");
       }
 
       const data = await response.json();
-      console.log(`Found ${data.messages?.length || 0} messages`);
       return data.messages || [];
     } catch (error) {
       console.error("Error in searchEmails:", error);
@@ -40,7 +39,6 @@ class GmailService {
 
   async getEmailContent(messageId) {
     try {
-      console.log("Getting email details for message:", messageId);
       const response = await fetch(
         `${this.baseUrl}/messages/${messageId}?format=full`,
         {
@@ -50,15 +48,13 @@ class GmailService {
 
       if (!response.ok) {
         const error = await response.json();
-        console.error("Error getting email details:", error);
         throw new Error(error.error?.message || "Failed to get email details");
       }
 
       const data = await response.json();
-      console.log("Email details retrieved successfully");
       return this.parseEmailContent(data);
     } catch (error) {
-      console.error("Error in getEmailDetails:", error);
+      console.error("Error in getEmailContent:", error);
       throw error;
     }
   }
@@ -70,7 +66,6 @@ class GmailService {
 
     let body = "";
     if (email.payload.parts) {
-      // Handle multipart emails
       const textPart = email.payload.parts.find(
         (part) =>
           part.mimeType === "text/plain" || part.mimeType === "text/html"
@@ -79,7 +74,6 @@ class GmailService {
         body = atob(textPart.body.data.replace(/-/g, "+").replace(/_/g, "/"));
       }
     } else if (email.payload.body.data) {
-      // Handle single part emails
       body = atob(
         email.payload.body.data.replace(/-/g, "+").replace(/_/g, "/")
       );
@@ -95,14 +89,48 @@ class GmailService {
   }
 
   extractRideCost(body) {
-    const regex = /Total BDT\s*([\d.]+)/i;
-    const match = body.match(regex);
-    return match ? parseFloat(match[1]) : null;
+    const cleanBody = body
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/Â/g, " ")
+      .replace(/\u00A0/g, " ")
+      .replace(/\u2009/g, " ")
+      .replace(/\u202F/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const patterns = [
+      /Total:\s*\$([0-9,]+\.?\d*)/i,
+      /Total\s*\$([0-9,]+\.?\d*)/i,
+      /Total\s+BDT\s*([0-9,]+\.?\d*)/i,
+      /Total:\s*BDT\s*([0-9,]+\.?\d*)/i,
+      /Total\s*([0-9,]+\.?\d*)/i,
+      /Fare:\s*\$([0-9,]+\.?\d*)/i,
+      /Amount:\s*\$([0-9,]+\.?\d*)/i,
+      /\$([0-9,]+\.?\d*)\s*total/i,
+      /BDT\s*([0-9,]+\.?\d*)/i,
+      /([0-9,]+\.?\d*)\s*BDT/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = cleanBody.match(pattern);
+      if (match) {
+        const amount = parseFloat(match[1].replace(/,/g, ""));
+        if (!isNaN(amount) && amount > 0) {
+          return amount;
+        }
+      }
+    }
+
+    return null;
   }
 
   async scanEmails() {
     try {
-      const { messages } = await this.searchEmails();
+      const messages = await this.searchEmails();
       const results = [];
 
       for (const message of messages) {
@@ -114,12 +142,13 @@ class GmailService {
         const cost = this.extractRideCost(email.body);
 
         if (cost !== null) {
-          results.push({
+          const result = {
             id: email.id,
             date: email.date,
             cost,
             subject: email.subject,
-          });
+          };
+          results.push(result);
           this.scannedMessageIds.add(email.id);
         }
       }
@@ -133,96 +162,6 @@ class GmailService {
 
   clearScannedCache() {
     this.scannedMessageIds.clear();
-  }
-
-  async getEmailBody(messageId) {
-    try {
-      console.log("Getting email body for message:", messageId);
-      const email = await this.getEmailContent(messageId);
-      const body =
-        email.payload?.parts?.find((part) => part.mimeType === "text/plain")
-          ?.body?.data || email.payload?.body?.data;
-
-      if (!body) {
-        console.log("No body found in email");
-        return "";
-      }
-
-      const decodedBody = atob(body.replace(/-/g, "+").replace(/_/g, "/"));
-      console.log("Email body retrieved successfully");
-      return decodedBody;
-    } catch (error) {
-      console.error("Error in getEmailBody:", error);
-      throw error;
-    }
-  }
-
-  async processRideEmails() {
-    try {
-      console.log("Starting to process ride emails...");
-      const query = 'from:uber subject:"Your Uber Receipt"';
-      const messages = await this.searchEmails(query);
-
-      console.log(`Processing ${messages.length} ride emails...`);
-      const processedEmails = [];
-
-      for (const message of messages) {
-        try {
-          const body = await this.getEmailBody(message.id);
-          const receipt = this.parseRideReceipt(body);
-
-          if (receipt) {
-            processedEmails.push(receipt);
-            await storageService.saveReceipt(receipt);
-          }
-        } catch (error) {
-          console.error(`Error processing email ${message.id}:`, error);
-        }
-      }
-
-      console.log(
-        `Successfully processed ${processedEmails.length} ride emails`
-      );
-      return processedEmails;
-    } catch (error) {
-      console.error("Error in processRideEmails:", error);
-      throw error;
-    }
-  }
-
-  parseRideReceipt(emailBody) {
-    try {
-      console.log("Parsing ride receipt from email body...");
-      // Extract date
-      const dateMatch = emailBody.match(/Date: ([\w\s,]+)/);
-      const date = dateMatch ? new Date(dateMatch[1]) : null;
-
-      // Extract amount
-      const amountMatch = emailBody.match(/Total: \$(\d+\.\d+)/);
-      const amount = amountMatch ? parseFloat(amountMatch[1]) : null;
-
-      // Extract trip details
-      const tripMatch = emailBody.match(/Trip: ([\w\s]+)/);
-      const tripDetails = tripMatch ? tripMatch[1].trim() : "";
-
-      if (!date || !amount) {
-        console.log("Could not parse required fields from email");
-        return null;
-      }
-
-      const receipt = {
-        date: date.toISOString(),
-        amount,
-        tripDetails,
-        source: "gmail",
-      };
-
-      console.log("Successfully parsed receipt:", receipt);
-      return receipt;
-    } catch (error) {
-      console.error("Error parsing ride receipt:", error);
-      return null;
-    }
   }
 }
 

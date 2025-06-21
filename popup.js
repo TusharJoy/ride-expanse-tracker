@@ -1,7 +1,5 @@
-// Import services
 import { oauthService } from "./src/services/oauth.js";
 import { storageService } from "./src/services/storage.js";
-import { gmailService } from "./src/services/gmail.js";
 
 // UI Elements
 const authStatus = document.getElementById("authStatus");
@@ -24,12 +22,8 @@ const transactionsList = document.getElementById("transactionsList");
 // Initialize popup
 async function initializePopup() {
   try {
-    console.log("Initializing popup...");
-
-    // Initialize storage first
     await storageService.init();
 
-    // Set default date range (current month)
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -37,14 +31,10 @@ async function initializePopup() {
     startDate.value = firstDay.toISOString().split("T")[0];
     endDate.value = lastDay.toISOString().split("T")[0];
 
-    // Check authentication status
     const isAuthenticated = await oauthService.init();
     updateAuthStatus(isAuthenticated);
 
-    // Load and display data
     await loadTransactionData();
-
-    console.log("Popup initialized successfully");
   } catch (error) {
     console.error("Error initializing popup:", error);
     showError("Failed to initialize popup");
@@ -140,11 +130,9 @@ function displayTransactions(transactions) {
 async function handleConnect() {
   try {
     if (oauthService.isAuthenticated) {
-      // Disconnect
       await oauthService.revokeToken();
       updateAuthStatus(false);
     } else {
-      // Connect
       connectBtn.textContent = "Connecting...";
       connectBtn.disabled = true;
 

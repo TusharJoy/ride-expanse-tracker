@@ -1,4 +1,3 @@
-// Background script for handling OAuth and message passing
 import { oauthService } from "./src/services/oauth.js";
 import { gmailService } from "./src/services/gmail.js";
 import { storageService } from "./src/services/storage.js";
@@ -6,13 +5,8 @@ import { storageService } from "./src/services/storage.js";
 // Initialize services
 async function initializeServices() {
   try {
-    console.log("Initializing services...");
     await storageService.init();
     const isAuthenticated = await oauthService.init();
-    console.log(
-      "Services initialized. Authentication status:",
-      isAuthenticated
-    );
     return isAuthenticated;
   } catch (error) {
     console.error("Error initializing services:", error);
@@ -22,12 +16,10 @@ async function initializeServices() {
 
 // Handle messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log("Received message:", request);
-
   switch (request.type) {
     case "AUTHENTICATE":
       handleAuthentication(sendResponse);
-      return true; // Keep the message channel open for async response
+      return true;
 
     case "PROCESS_EMAILS":
       handleProcessEmails(sendResponse);
@@ -42,16 +34,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
 
     default:
-      console.warn("Unknown message type:", request.type);
       sendResponse({ success: false, error: "Unknown message type" });
   }
 });
 
 async function handleAuthentication(sendResponse) {
   try {
-    console.log("Handling authentication request...");
     const isAuthenticated = await oauthService.authenticate();
-    console.log("Authentication status:", isAuthenticated);
     sendResponse({ success: true, isAuthenticated });
   } catch (error) {
     console.error("Authentication error:", error);
@@ -61,9 +50,17 @@ async function handleAuthentication(sendResponse) {
 
 async function handleProcessEmails(sendResponse) {
   try {
-    console.log("Processing emails...");
-    const receipts = await gmailService.processRideEmails();
-    console.log(`Processed ${receipts.length} receipts`);
+    const receipts = await gmailService.scanEmails();
+
+    for (const receipt of receipts) {
+      await storageService.saveReceipt({
+        date: receipt.date.toISOString(),
+        amount: receipt.cost,
+        tripDetails: receipt.subject,
+        source: "gmail",
+      });
+    }
+
     sendResponse({ success: true, receipts });
   } catch (error) {
     console.error("Error processing emails:", error);
@@ -73,9 +70,7 @@ async function handleProcessEmails(sendResponse) {
 
 async function handleGetReceipts(sendResponse) {
   try {
-    console.log("Getting receipts...");
     const receipts = await storageService.getReceipts();
-    console.log(`Retrieved ${receipts.length} receipts`);
     sendResponse({ success: true, receipts });
   } catch (error) {
     console.error("Error getting receipts:", error);
@@ -85,10 +80,8 @@ async function handleGetReceipts(sendResponse) {
 
 async function handleExportCSV(sendResponse) {
   try {
-    console.log("Exporting to CSV...");
     const receipts = await storageService.getReceipts();
     const csv = convertToCSV(receipts);
-    console.log("CSV export completed");
     sendResponse({ success: true, csv });
   } catch (error) {
     console.error("Error exporting to CSV:", error);
